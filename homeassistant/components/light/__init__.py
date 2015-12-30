@@ -10,7 +10,7 @@ import logging
 import os
 import csv
 
-from homeassistant.components import group, discovery, wink, isy994, zwave
+from homeassistant.components import group, discovery, wink, isy994, zwave, tellduslive
 from homeassistant.config import load_yaml_config_file
 from homeassistant.const import (
     STATE_ON, SERVICE_TURN_ON, SERVICE_TURN_OFF, ATTR_ENTITY_ID)
@@ -61,6 +61,7 @@ DISCOVERY_PLATFORMS = {
     isy994.DISCOVER_LIGHTS: 'isy994',
     discovery.SERVICE_HUE: 'hue',
     zwave.DISCOVER_LIGHTS: 'zwave',
+    tellduslive.DISCOVER_LIGHTS: 'tellduslive',
 }
 
 PROP_TO_ATTR = {

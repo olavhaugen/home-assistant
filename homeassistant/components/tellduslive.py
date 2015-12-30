@@ -42,6 +42,7 @@ from homeassistant.const import (
 DOMAIN = "tellduslive"
 DISCOVER_SWITCHES = "tellduslive.switches"
 DISCOVER_SENSORS = "tellduslive.sensors"
+DISCOVER_LIGHTS = "tellduslive.lights"
 
 CONF_PUBLIC_KEY = "public_key"
 CONF_PRIVATE_KEY = "private_key"
@@ -72,6 +73,7 @@ class TelldusLiveData(object):
 
         self._sensors = []
         self._switches = []
+        self._lights = []
 
         self._client = LiveClient(public_key=public_key,
                                   private_key=private_key,
@@ -83,8 +85,11 @@ class TelldusLiveData(object):
         """ Send discovery event if component not yet discovered """
         self._update_sensors()
         self._update_switches()
+        self._update_lights()
+
         for component_name, found_devices, discovery_type in \
-            (('sensor', self._sensors, DISCOVER_SENSORS),
+            (('light', self._lights, DISCOVER_LIGHTS),
+             ('sensor', self._sensors, DISCOVER_SENSORS),
              ('switch', self._switches, DISCOVER_SWITCHES)):
             if len(found_devices):
                 component = get_component(component_name)
@@ -100,6 +105,7 @@ class TelldusLiveData(object):
 
         supported_methods = const.TELLSTICK_TURNON \
             | const.TELLSTICK_TURNOFF \
+            | const.TELLSTICK_DIM \
             | const.TELLSTICK_TOGGLE
 
         default_params = {'supportedMethods': supported_methods,
@@ -136,10 +142,18 @@ class TelldusLiveData(object):
     def _update_switches(self):
         """ Get the configured switches from Telldus Live"""
         _LOGGER.info("Updating switches from Telldus Live")
-        self._switches = self._request("devices/list")["device"]
         # filter out any group of switches
-        self._switches = [switch for switch in self._switches
-                          if switch["type"] == "device"]
+        # TODO: Better check for device type
+        self._switches = [switch for switch in self._request("devices/list")["device"]
+                          if switch["type"] == "device" and switch["methods"] == 3]
+
+    def _update_lights(self):
+        """ Get the configured switches from Telldus Live"""
+        _LOGGER.info("Updating lights from Telldus Live")
+        # filter out any group of switches
+        # TODO: Better check for device type
+        self._lights = [light for light in self._request("devices/list")["device"]
+                          if light["type"] == "device" and light["methods"] == 19]
 
     def get_sensors(self):
         """ Get the configured sensors """
@@ -150,6 +164,11 @@ class TelldusLiveData(object):
         """ Get the configured switches """
         self._update_switches()
         return self._switches
+
+    def get_lights(self):
+        """ Get the configured lights """
+        self._update_lights()
+        return self._lights
 
     def get_sensor_value(self, sensor_id, sensor_name):
         """ Get the latest (possibly cached) sensor value """
@@ -176,6 +195,9 @@ class TelldusLiveData(object):
         """ turn switch on """
         return self.check_request("device/turnOff", id=switch_id)
 
+    def dim_light(self, device_id, level):
+        """ dim light to a given level (0-255) """
+        return self.check_request("device/dim", id=device_id, level=level)
 
 def setup(hass, config):
     """ Setup the tellduslive component """
@@ -194,16 +216,16 @@ def setup(hass, config):
             "that can be aquired from https://api.telldus.com/keys/index")
         return False
 
-    global NETWORK
-    NETWORK = TelldusLiveData(hass, config)
+    if (not NETWORK):
+        global NETWORK
+        NETWORK = TelldusLiveData(hass, config)
 
-    if not NETWORK.validate_session():
-        _LOGGER.error(
-            "Authentication Error: "
-            "Please make sure you have configured your keys "
-            "that can be aquired from https://api.telldus.com/keys/index")
-        return False
+        if not NETWORK.validate_session():
+            _LOGGER.error(
+                "Authentication Error: "
+                "Please make sure you have configured your keys "
+                "that can be aquired from https://api.telldus.com/keys/index")
+            return False
 
-    NETWORK.update(hass, config)
-
+        NETWORK.update(hass, config)
     return True
